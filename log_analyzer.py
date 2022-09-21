@@ -112,7 +112,8 @@ def log_parser(log_file_path: str) -> List[dict]:
              }
             )
     # TODO add url column
-    # TODO add sorting by time_sum
+    # add sorting by time_sum
+    results = sorted(results, key=lambda d: d['time_sum'],reverse=True)
     return results
 
 
@@ -140,10 +141,14 @@ def render_html_report(report_list: List[dict], report_file_path: str, config_: 
 def main(config_: dict):
     file_name, date, ext = find_log_file(config_["LOG_DIR"])
     report_file_name = f"report-{date.year}.{date.month}.{date.day}.html"
-    logger.info(f"Latest log file is {file_name} (date: {date})")
+
     # TODO: Change condition
     if report_file_name in os.listdir(config_["REPORT_DIR"]):
+        logger.info(f"Report of latest log file already exist in report dir: {report_file_name}")
         return
+
+    logger.info(f"Latest log file is {file_name} (date: {date})")
+
     # Parse latest log file
     report_list = log_parser(os.path.join(config_["LOG_DIR"], file_name))
 
