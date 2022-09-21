@@ -9,6 +9,7 @@ import logging
 import os
 import re
 from statistics import median
+from string import Template
 from typing import Generator, List, NamedTuple
 
 # log_format ui_short '$remote_addr  $remote_user $http_x_real_ip [$time_local] "$request" '
@@ -17,11 +18,12 @@ from typing import Generator, List, NamedTuple
 #                     '$request_time';
 
 config = {
-    "REPORT_SIZE": 1,
+    "REPORT_SIZE": 5,
     "REPORT_DIR": "./reports",
     "LOG_DIR": "./log",
-    "LOG_FILE": "log_analyzer.log",
+    "LOG_FILE": "",
     "ERROR_THRESHOLD": 0.7,
+    "REPORT_TEMPLATE_PATH": r"report.html"
     }
 
 # logging settings
@@ -109,18 +111,45 @@ def log_parser(log_file_path: str) -> List[dict]:
              "time_med": median(req_times)
              }
             )
-
+    # TODO add url column
+    # TODO add sorting by time_sum
     return results
+
+
+def render_html_report(report_list: List[dict], report_file_path: str, config_: dict):
+    """
+    Create html report from list of report rows
+
+
+    :param report_list: list of dicts with report rows info
+    :param report_file_path: path to report file
+    :param config_: configuration dict
+    :return:
+    """
+    with open(config_["REPORT_TEMPLATE_PATH"], "r") as f:
+        report_template = f.read()
+
+    report_list = report_list[:config_["REPORT_SIZE"]]
+    report_table_str = Template("var table = $table_json;").substitute(table_json=report_list)
+    report_template = re.sub(r"var table = \$table_json;", report_table_str, report_template)
+
+    with open(report_file_path, "w") as f:
+        f.write(report_template)
 
 
 def main(config_: dict):
     file_name, date, ext = find_log_file(config_["LOG_DIR"])
+    report_file_name = f"report-{date.year}.{date.month}.{date.day}.html"
     logger.info(f"Latest log file is {file_name} (date: {date})")
     # TODO: Change condition
-    if file_name in os.listdir(config_["REPORT_DIR"]):
+    if report_file_name in os.listdir(config_["REPORT_DIR"]):
         return
+    # Parse latest log file
+    report_list = log_parser(os.path.join(config_["LOG_DIR"], file_name))
 
-    log_parser(os.path.join(config_["LOG_DIR"], file_name))
+    # Create html report
+    report_file_path = os.path.join(config_["REPORT_DIR"], report_file_name)
+    render_html_report(report_list, report_file_path, config_=config_)
 
 
 if __name__ == "__main__":
