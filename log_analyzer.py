@@ -22,7 +22,7 @@ CONFIG = {
     "REPORT_DIR": "./reports",
     "LOG_DIR": "./log",
     "LOG_FILE": "",
-    "ERROR_THRESHOLD": 0.7,
+    "ERROR_THRESHOLD": 0.5,
     "REPORT_TEMPLATE_PATH": r"report.html"
     }
 

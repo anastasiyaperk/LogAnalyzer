@@ -1,5 +1,8 @@
 {
-  "REPORT_SIZE": 50,
+  "REPORT_SIZE": 10,
   "REPORT_DIR": "./reports",
-  "LOG_DIR": "./log"
+  "LOG_DIR": "./log",
+  "LOG_FILE": "log-analyzer.log",
+  "ERROR_THRESHOLD": 0.5,
+  "REPORT_TEMPLATE_PATH": "report.html"
 }
