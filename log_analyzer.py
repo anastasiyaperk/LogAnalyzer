@@ -102,7 +102,8 @@ def log_parser(log_file_path: str) -> List[dict]:
         req_count = len(req_times)
         req_time_sum = sum(req_times)
         results.append(
-            {"count": req_count,
+            {"url": url,
+             "count": req_count,
              "count_perc": (req_count / lines_count) * 100,
              "time_sum": req_time_sum,
              "time_perc": (req_time_sum / all_requests_time) * 100,
@@ -111,9 +112,8 @@ def log_parser(log_file_path: str) -> List[dict]:
              "time_med": median(req_times)
              }
             )
-    # TODO add url column
     # add sorting by time_sum
-    results = sorted(results, key=lambda d: d['time_sum'],reverse=True)
+    results = sorted(results, key=lambda d: d['time_sum'], reverse=True)
     return results
 
 
