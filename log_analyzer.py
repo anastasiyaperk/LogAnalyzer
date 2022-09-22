@@ -17,8 +17,8 @@ from typing import Generator, List, NamedTuple
 #                     '"$http_user_agent" "$http_x_forwarded_for" "$http_X_REQUEST_ID" "$http_X_RB_USER" '
 #                     '$request_time';
 
-config = {
-    "REPORT_SIZE": 5,
+CONFIG = {
+    "REPORT_SIZE": 10,
     "REPORT_DIR": "./reports",
     "LOG_DIR": "./log",
     "LOG_FILE": "",
@@ -27,10 +27,10 @@ config = {
     }
 
 # logging settings
-logging.basicConfig(filename=config.get("LOG_FILE"),
+logging.basicConfig(filename=CONFIG.get("LOG_FILE"),
                     format='[%(asctime)s] %(levelname).1s %(message)s',
                     datefmt='%Y.%m.%d %H:%M:%S',
-                    level=logging.INFO
+                    level=logging.INFO,
                     )
 logger = logging.getLogger()
 
@@ -78,7 +78,7 @@ def log_parser(log_file_path: str) -> List[dict]:
     """
     Parse log file and collect url statistics by request time
 
-    :param log_file_path:
+    :param log_file_path: path to log file for parsing
     :return: list of dicts with statistics values
     """
     log_lines = log_file_reader(log_file_path)
@@ -155,6 +155,7 @@ def main(config_: dict):
     # Create html report
     report_file_path = os.path.join(config_["REPORT_DIR"], report_file_name)
     render_html_report(report_list, report_file_path, config_=config_)
+    logger.info(f"Report of latest log saved to: {render_html_report}")
 
 
 if __name__ == "__main__":
@@ -167,9 +168,9 @@ if __name__ == "__main__":
         if args.config:
             logger.info(f"Using config from file {args.config}")
             with open(args.config, 'r') as f:
-                config.update(json.load(f))
+                CONFIG.update(json.load(f))
 
-        main(config)
+        main(CONFIG)
 
     except Exception as ex:
         logger.error(ex, exc_info=True)
