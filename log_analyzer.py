@@ -74,21 +74,28 @@ def log_file_reader(log_file_path: str) -> Generator:
     log.close()
 
 
-def log_parser(log_file_path: str) -> List[dict]:
+def log_parser(log_file_path: str, error_threshold: float) -> List[dict]:
     """
     Parse log file and collect url statistics by request time
 
+
     :param log_file_path: path to log file for parsing
+    :param error_threshold: threshold of errors in parsing lines
     :return: list of dicts with statistics values
     """
     log_lines = log_file_reader(log_file_path)
     url_req_times = {}
-    all_requests_time = lines_count = 0
+    all_requests_time = lines_count = error_lines_count = 0
 
     for line in log_lines:
         line_fields = line.split()
-        url = line_fields[6]
-        request_time = float(line_fields[-1])
+        try:
+            url = line_fields[6]
+            request_time = float(line_fields[-1])
+        except ValueError:
+            error_lines_count += 1
+            continue
+
         all_requests_time += request_time
         lines_count += 1
         try:
@@ -96,8 +103,15 @@ def log_parser(log_file_path: str) -> List[dict]:
         except KeyError:
             url_req_times[url] = [request_time]
 
-    # TODO add condition of unread lines threshold
     results = []
+    error_rate = error_lines_count / lines_count
+    if error_rate >= error_threshold:
+        logger.warning(
+            f"Error rate exceeds the threshold value: {error_rate} (threshold = {error_threshold}). "
+            f"Parsing will be finished"
+            )
+        return results
+
     for url, req_times in url_req_times.items():
         req_count = len(req_times)
         req_time_sum = sum(req_times)
@@ -153,9 +167,10 @@ def main(config_: dict):
     report_list = log_parser(os.path.join(config_["LOG_DIR"], file_name))
 
     # Create html report
-    report_file_path = os.path.join(config_["REPORT_DIR"], report_file_name)
-    render_html_report(report_list, report_file_path, config_=config_)
-    logger.info(f"Report of latest log saved to: {render_html_report}")
+    if report_list:
+        report_file_path = os.path.join(config_["REPORT_DIR"], report_file_name)
+        render_html_report(report_list, report_file_path, config_=config_)
+        logger.info(f"Report of latest log saved to: {render_html_report}")
 
 
 if __name__ == "__main__":
