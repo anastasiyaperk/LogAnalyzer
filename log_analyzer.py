@@ -10,7 +10,7 @@ import os
 import re
 from statistics import median
 from string import Template
-from typing import Generator, List, NamedTuple
+from typing import Generator, List, NamedTuple, Union
 
 # log_format ui_short '$remote_addr  $remote_user $http_x_real_ip [$time_local] "$request" '
 #                     '$status $body_bytes_sent "$http_referer" '
@@ -18,7 +18,7 @@ from typing import Generator, List, NamedTuple
 #                     '$request_time';
 
 CONFIG = {
-    "REPORT_SIZE": 10,
+    "REPORT_SIZE": 30,
     "REPORT_DIR": "./reports",
     "LOG_DIR": "./log",
     "LOG_FILE": "",
@@ -35,18 +35,23 @@ logging.basicConfig(filename=CONFIG.get("LOG_FILE"),
 logger = logging.getLogger()
 
 
-def find_log_file(logs_dir_path: str) -> NamedTuple:
+def find_log_file(logs_dir_path: str) -> Union[NamedTuple, None]:
     """
     Find the latest log file by its name
 
     :param logs_dir_path: path to logs directory
-    :return: namedtuple with the latest log file name, extension, date
+    :return: namedtuple with the latest log file name, extension, date. None, if logdir is empty
     """
     files = os.listdir(logs_dir_path)
+    if not files:
+        return None
+
     date_regexp = r"\d{8}"
     logfile_regex = f"nginx-access-ui.log-{date_regexp}(.gz)?"
 
     nginx_log_files = sorted([file for file in files if re.match(logfile_regex, file)], reverse=True)
+    if not nginx_log_files:
+        return None
 
     latest_logfile = nginx_log_files[0]
     date = datetime.strptime(re.search(date_regexp, latest_logfile).group(0), "%Y%m%d")
@@ -153,7 +158,12 @@ def render_html_report(report_list: List[dict], report_file_path: str, config_: 
 
 
 def main(config_: dict):
-    file_name, date, ext = find_log_file(config_["LOG_DIR"])
+    log_file_info = find_log_file(config_["LOG_DIR"])
+    if not log_file_info:
+        logger.warning(f"Log directory does not contain logs for analysis. Parsing will be finished")
+        return
+
+    file_name, date, ext = log_file_info
     report_file_name = f"report-{date.year}.{date.month}.{date.day}.html"
 
     # TODO: Change condition
@@ -164,7 +174,7 @@ def main(config_: dict):
     logger.info(f"Latest log file is {file_name} (date: {date})")
 
     # Parse latest log file
-    report_list = log_parser(os.path.join(config_["LOG_DIR"], file_name))
+    report_list = log_parser(os.path.join(config_["LOG_DIR"], file_name), config_['ERROR_THRESHOLD'])
 
     # Create html report
     if report_list:
