@@ -10,7 +10,7 @@ import os
 import re
 from statistics import median
 from string import Template
-from typing import Generator, List, NamedTuple, Union
+from typing import Generator, List, NamedTuple, Optional
 
 # log_format ui_short '$remote_addr  $remote_user $http_x_real_ip [$time_local] "$request" '
 #                     '$status $body_bytes_sent "$http_referer" '
@@ -35,7 +35,7 @@ logging.basicConfig(filename=CONFIG.get("LOG_FILE"),
 logger = logging.getLogger()
 
 
-def find_log_file(logs_dir_path: str) -> Union[NamedTuple, None]:
+def find_log_file(logs_dir_path: str) -> Optional[NamedTuple]:
     """
     Find the latest log file by its name
 
@@ -79,7 +79,7 @@ def log_file_reader(log_file_path: str) -> Generator:
     log.close()
 
 
-def log_parser(log_file_path: str, error_threshold: float) -> List[dict]:
+def log_parser(log_file_path: str, error_threshold: float) -> Optional[List[dict]]:
     """
     Parse log file and collect url statistics by request time
 
@@ -108,15 +108,15 @@ def log_parser(log_file_path: str, error_threshold: float) -> List[dict]:
         except KeyError:
             url_req_times[url] = [request_time]
 
-    results = []
     error_rate = error_lines_count / lines_count
     if error_rate >= error_threshold:
         logger.warning(
             f"Error rate exceeds the threshold value: {error_rate} (threshold = {error_threshold}). "
             f"Parsing will be finished"
             )
-        return results
+        return None
 
+    results = []
     for url, req_times in url_req_times.items():
         req_count = len(req_times)
         req_time_sum = sum(req_times)
