@@ -1,7 +1,6 @@
 #  !/usr/bin/env python
 # -*- coding: utf-8 -*-
 import argparse
-from collections import namedtuple
 from datetime import datetime
 import gzip
 import json
@@ -10,7 +9,7 @@ import os
 import re
 from statistics import median
 from string import Template
-from typing import Generator, List, NamedTuple, Optional
+from typing import Generator, Iterable, List, Optional
 
 # log_format ui_short '$remote_addr  $remote_user $http_x_real_ip [$time_local] "$request" '
 #                     '$status $body_bytes_sent "$http_referer" '
@@ -18,12 +17,12 @@ from typing import Generator, List, NamedTuple, Optional
 #                     '$request_time';
 
 CONFIG = {
-    "REPORT_SIZE": 30,
+    "REPORT_SIZE": 10,
     "REPORT_DIR": "./reports",
     "LOG_DIR": "./log",
     "LOG_FILE": "",
     "ERROR_THRESHOLD": 0.5,
-    "REPORT_TEMPLATE_PATH": r"report.html"
+    "REPORT_TEMPLATE_PATH": "report.html"
     }
 
 # logging settings
@@ -35,7 +34,7 @@ logging.basicConfig(filename=CONFIG.get("LOG_FILE"),
 logger = logging.getLogger()
 
 
-def find_log_file(logs_dir_path: str) -> Optional[NamedTuple]:
+def find_log_file(logs_dir_path: str) -> Optional[tuple]:
     """
     Find the latest log file by its name
 
@@ -43,9 +42,6 @@ def find_log_file(logs_dir_path: str) -> Optional[NamedTuple]:
     :return: namedtuple with the latest log file name, extension, date. None, if logdir is empty
     """
     files = os.listdir(logs_dir_path)
-    if not files:
-        return None
-
     date_regexp = r"\d{8}"
     logfile_regex = f"nginx-access-ui.log-{date_regexp}(.gz)?"
 
@@ -56,9 +52,8 @@ def find_log_file(logs_dir_path: str) -> Optional[NamedTuple]:
     latest_logfile = nginx_log_files[0]
     date = datetime.strptime(re.search(date_regexp, latest_logfile).group(0), "%Y%m%d")
     ext = ".gz" if latest_logfile.endswith(".gz") else None
-    LogFile = namedtuple("LogFile", ["file", "date", "ext"])
 
-    return LogFile(file=latest_logfile, date=date, ext=ext)
+    return latest_logfile, date, ext
 
 
 def log_file_reader(log_file_path: str) -> Generator:
@@ -79,21 +74,21 @@ def log_file_reader(log_file_path: str) -> Generator:
     log.close()
 
 
-def log_parser(log_file_path: str, error_threshold: float) -> Optional[List[dict]]:
+def log_parser(log_lines: Iterable, error_threshold: float) -> Optional[List[dict]]:
     """
     Parse log file and collect url statistics by request time
 
-
-    :param log_file_path: path to log file for parsing
+    :param log_lines: iterable object with log lines
     :param error_threshold: threshold of errors in parsing lines
     :return: list of dicts with statistics values
     """
-    log_lines = log_file_reader(log_file_path)
     url_req_times = {}
     all_requests_time = lines_count = error_lines_count = 0
 
     for line in log_lines:
         line_fields = line.split()
+
+        # TODO: Check validation more correctly
         try:
             url = line_fields[6]
             request_time = float(line_fields[-1])
@@ -136,20 +131,18 @@ def log_parser(log_file_path: str, error_threshold: float) -> Optional[List[dict
     return results
 
 
-def render_html_report(report_list: List[dict], report_file_path: str, config_: dict):
+def render_html_report(report_list: List[dict], report_file_path: str, report_template_path: str):
     """
     Create html report from list of report rows
 
-
     :param report_list: list of dicts with report rows info
     :param report_file_path: path to report file
-    :param config_: configuration dict
+    :param report_template_path: path to report template path
     :return:
     """
-    with open(config_["REPORT_TEMPLATE_PATH"], "r") as f:
+    with open(report_template_path, "r") as f:
         report_template = f.read()
 
-    report_list = report_list[:config_["REPORT_SIZE"]]
     report_table_str = Template("var table = $table_json;").substitute(table_json=report_list)
     report_template = re.sub(r"var table = \$table_json;", report_table_str, report_template)
 
@@ -166,21 +159,23 @@ def main(config_: dict):
     file_name, date, ext = log_file_info
     report_file_name = f"report-{date.year}.{date.month}.{date.day}.html"
 
-    # TODO: Change condition
     if report_file_name in os.listdir(config_["REPORT_DIR"]):
         logger.info(f"Report of latest log file already exist in report dir: {report_file_name}")
         return
 
     logger.info(f"Latest log file is {file_name} (date: {date})")
 
-    # Parse latest log file
-    report_list = log_parser(os.path.join(config_["LOG_DIR"], file_name), config_['ERROR_THRESHOLD'])
+    # Get generator with lines from the latest log file
+    log_lines = log_file_reader(os.path.join(config_["LOG_DIR"], file_name))
+
+    # Parse logs
+    report_list = log_parser(log_lines, config_['ERROR_THRESHOLD'])
 
     # Create html report
     if report_list:
         report_file_path = os.path.join(config_["REPORT_DIR"], report_file_name)
-        render_html_report(report_list, report_file_path, config_=config_)
-        logger.info(f"Report of latest log saved to: {render_html_report}")
+        render_html_report(report_list[:config_["REPORT_SIZE"]], report_file_path, config_["REPORT_TEMPLATE_PATH"])
+        logger.info(f"Report of latest log saved to: {report_file_path}")
 
 
 if __name__ == "__main__":
