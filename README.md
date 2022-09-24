@@ -48,4 +48,8 @@ python log_analyzer.py --config ../path-to-config.json
 
 ## Тестирование
 
-todo
+Тесты можно запустить следующей командой
+
+```shell
+python -m unittest tests/test_log_analyzer.py
+```
